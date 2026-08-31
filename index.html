@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BudgetWise - Budget Tracker</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;max-width:420px;margin:0 auto;min-height:100vh}
+.phone{padding:1rem;min-height:100vh}
+.header{text-align:center;margin-bottom:1.5rem}
+.header h1{font-size:1.5rem;background:linear-gradient(135deg,#22c55e,#06b6d4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.balance{background:linear-gradient(135deg,#1e293b,#334155);border-radius:16px;padding:2rem;text-align:center;margin-bottom:1.5rem}
+.balance .label{color:#94a3b8;font-size:0.85rem}.balance .amount{font-size:2.5rem;font-weight:700;margin-top:0.25rem}
+.balance .income{color:#22c55e;font-size:0.9rem}.balance .expense{color:#ef4444;font-size:0.9rem}
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1.5rem}
+.summary-card{background:#1e293b;padding:1rem;border-radius:12px;text-align:center}
+.summary-card .val{font-size:1.3rem;font-weight:700}.summary-card .lbl{font-size:0.75rem;color:#94a3b8}
+.tabs{display:flex;gap:0.5rem;margin-bottom:1rem}
+.tab{flex:1;text-align:center;padding:0.5rem;border-radius:8px;background:#1e293b;cursor:pointer;font-size:0.85rem}
+.tab.active{background:linear-gradient(135deg,#22c55e,#06b6d4)}
+.txn{display:flex;justify-content:space-between;align-items:center;padding:0.75rem;background:#1e293b;border-radius:8px;margin-bottom:0.5rem}
+.txn .info .cat{font-weight:600}.txn .info .date{font-size:0.75rem;color:#94a3b8}
+.txn .amount{font-weight:700}
+.txn .amount.income{color:#22c55e}.txn .amount.expense{color:#ef4444}
+.btn{background:linear-gradient(135deg,#22c55e,#06b6d4);color:#fff;border:none;padding:0.75rem;border-radius:8px;width:100%;font-size:1rem;cursor:pointer;margin-top:0.5rem}
+input,select{background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:0.5rem;border-radius:6px;width:100%;margin-bottom:0.5rem}
+.form-group{margin-bottom:0.5rem}
+.form-group label{display:block;font-size:0.8rem;color:#94a3b8;margin-bottom:0.25rem}
+.cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-bottom:0.5rem}
+.cat-btn{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:0.5rem;text-align:center;cursor:pointer;font-size:0.75rem}
+.cat-btn.selected{border-color:#22c55e;background:rgba(34,197,94,0.1)}
+</style>
+</head>
+<body>
+<div class="phone">
+<div class="header"><h1>BudgetWise</h1></div>
+<div class="balance">
+<div class="label">Total Balance</div>
+<div class="amount" id="totalBalance">$0.00</div>
+<div><span class="income" id="totalIncome">+$0</span> • <span class="expense" id="totalExpense">-$0</span></div>
+</div>
+<div class="summary">
+<div class="summary-card"><div class="val" style="color:#22c55e" id="monthIncome">$0</div><div class="lbl">Income (This Month)</div></div>
+<div class="summary-card"><div class="val" style="color:#ef4444" id="monthExpense">$0</div><div class="lbl">Expenses (This Month)</div></div>
+</div>
+<div class="tabs"><div class="tab active" onclick="switchTab('transactions')">Transactions</div><div class="tab" onclick="switchTab('add')">Add Transaction</div></div>
+<div id="transactions"><div id="txnList"></div></div>
+<div id="add" style="display:none">
+<div class="form-group"><label>Type</label><select id="txType"><option value="income">Income</option><option value="expense">Expense</option></select></div>
+<div class="form-group"><label>Amount ($)</label><input type="number" id="txAmount" step="0.01" placeholder="0.00"></div>
+<div class="form-group"><label>Category</label>
+<div class="cat-grid" id="catGrid"></div></div>
+<div class="form-group"><label>Description</label><input type="text" id="txDesc" placeholder="Optional description"></div>
+<button class="btn" onclick="addTransaction()">Add Transaction</button>
+</div>
+</div>
+<script>
+const STORE='budgetwise_data';
+let data=JSON.parse(localStorage.getItem(STORE)||'[]');
+let selectedCat='Food';
+const categories=['Food','Transport','Shopping','Bills','Health','Entertainment','Salary','Other'];
+const catEmojis={'Food':'🍔','Transport':'🚗','Shopping':'🛍️','Bills':'📄','Health':'💊','Entertainment':'🎮','Salary':'💰','Other':'📦'};
+function save(){localStorage.setItem(STORE,JSON.stringify(data))}
+function updateSummary(){
+const income=data.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+const expense=data.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+document.getElementById('totalBalance').textContent=`$${(income-expense).toFixed(2)}`;
+document.getElementById('totalIncome').textContent=`+$${income.toFixed(2)}`;
+document.getElementById('totalExpense').textContent=`-$${expense.toFixed(2)}`;
+const now=new Date();const month=now.getMonth();const year=now.getFullYear();
+const mIncome=data.filter(t=>t.type==='income'&&new Date(t.date).getMonth()===month&&new Date(t.date).getFullYear()===year).reduce((s,t)=>s+t.amount,0);
+const mExpense=data.filter(t=>t.type==='expense'&&new Date(t.date).getMonth()===month&&new Date(t.date).getFullYear()===year).reduce((s,t)=>s+t.amount,0);
+document.getElementById('monthIncome').textContent=`$${mIncome.toFixed(2)}`;
+document.getElementById('monthExpense').textContent=`$${mExpense.toFixed(2)}`;
+}
+function renderTxns(){
+const el=document.getElementById('txnList');
+if(!data.length){el.innerHTML='<p style="color:#94a3b8;text-align:center;padding:2rem;">No transactions yet</p>';return}
+el.innerHTML=data.slice().reverse().map(t=>`<div class="txn"><div class="info"><div class="cat">${catEmojis[t.category]||'📦'} ${t.category}</div><div class="date">${t.description||''} • ${new Date(t.date).toLocaleDateString()}</div></div><div class="amount ${t.type}">${t.type==='income'?'+':'-'}$${t.amount.toFixed(2)}</div></div>`).join('');
+}
+function renderCats(){
+document.getElementById('catGrid').innerHTML=categories.map(c=>`<div class="cat-btn ${selectedCat===c?'selected':''}" onclick="selectedCat='${c}';renderCats()">${catEmojis[c]} ${c}</div>`).join('');
+}
+function addTransaction(){
+const amount=parseFloat(document.getElementById('txAmount').value);
+if(!amount||amount<=0)return alert('Enter valid amount');
+const type=document.getElementById('txType').value;
+data.push({type,amount,category:selectedCat,description:document.getElementById('txDesc').value,date:new Date().toISOString()});
+save();updateSummary();renderTxns();
+document.getElementById('txAmount').value='';document.getElementById('txDesc').value='';
+alert('Transaction added!');
+}
+function switchTab(t){
+['transactions','add'].forEach(x=>document.getElementById(x).style.display='none');
+document.getElementById(t).style.display='block';
+document.querySelectorAll('.tab').forEach((tab,i)=>tab.classList.toggle('active',['transactions','add'].indexOf(t)===i));
+if(t==='add')renderCats();
+}
+updateSummary();renderTxns();
+</script>
+</body>
+</html>
